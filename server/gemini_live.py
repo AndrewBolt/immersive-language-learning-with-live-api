@@ -163,7 +163,7 @@ class GeminiLive:
                             
                             if server_content:
 
-                                # for token usage
+                                # uncomment for token usage
                                 # if response.usage_metadata:
                                 #     print("💰 Usage metadata:", response.usage_metadata)
 

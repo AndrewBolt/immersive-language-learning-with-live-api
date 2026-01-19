@@ -170,3 +170,20 @@ Use the `./scripts/dev.sh` hot-reloading server. As Antigravity writes the code,
 ### 4. Deploy Your Build
 
 Once you're happy with your changes, use the **One-Click Deployment** or use Antigravity's terminal to run `./scripts/deploy.sh` to push your build directly to Google Cloud Run.
+
+---
+
+## 💰 Cost Analysis (Estimate)
+
+> **NOTE:** Pricing based on the **Gemini 2.5 Flash Live API** costs as of **19th January 2026** (Source: [Google Cloud Pricing](https://cloud.google.com/vertex-ai/generative-ai/pricing)).
+> _Disclaimer: Usage metadata currently does not discern between input and output tokens. For a conservative estimate, we assume all tokens are billed at the higher **output token** rate._
+
+### Example Session: 1 Minute Conversation
+
+**Context**: Teacher Mode (Audio + Transcript enabled), Duration **1:09**.
+
+| Modality  | Token Count | Rate (Output)\* | Cost Estimate           |
+| :-------- | :---------- | :-------------- | :---------------------- |
+| **Audio** | 1,324       | $12.00 / 1M     | ~$0.0159                |
+| **Text**  | 518         | $2.00 / 1M      | ~$0.0010                |
+| **Total** | **1,842**   |                 | **~$0.017 (1.7 cents)** |
