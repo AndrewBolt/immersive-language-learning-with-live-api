@@ -27,6 +27,7 @@ class ViewChat extends HTMLElement {
   constructor() {
     super();
     this._mission = null;
+    this.showTranslation = false;
   }
 
   set mission(value) {
@@ -156,7 +157,9 @@ class ViewChat extends HTMLElement {
         ? `
             <div style="width: 100%; height: 250px; margin: 10px 0; position: relative;">
               <live-transcript></live-transcript>
+              <button id="show-translation" style="position: absolute; top: 10px; right: 10px; background: #fff; border: 1px solid #ccc; padding: 5px 10px; border-radius: 5px; cursor: pointer;">Show Translation</button>
             </div>
+            <div id="suggested-responses" style="width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 10px 0;"></div>
           `
         : ""
       }
@@ -325,6 +328,42 @@ class ViewChat extends HTMLElement {
       );
     };
 
+    // Show Translation Button
+    const showTranslationBtn = this.querySelector("#show-translation");
+    if (showTranslationBtn) {
+      showTranslationBtn.addEventListener("click", () => {
+        this.showTranslation = !this.showTranslation;
+        const transcriptEl = this.querySelector("live-transcript");
+        if (transcriptEl) {
+          transcriptEl.setAttribute("show-translation", this.showTranslation);
+          transcriptEl.updateLatestBubble();
+        }
+      });
+    }
+
+    // Suggested Responses
+    const suggestedResponsesContainer = this.querySelector("#suggested-responses");
+    if (suggestedResponsesContainer && this.suggestedResponses) {
+      suggestedResponsesContainer.innerHTML = "";
+      this.suggestedResponses.forEach(response => {
+        const button = document.createElement("button");
+        button.style.background = "#f0f0f0";
+        button.style.border = "1px solid #ccc";
+        button.style.padding = "5px 10px";
+        button.style.borderRadius = "5px";
+        button.style.cursor = "pointer";
+        button.innerHTML = `${response.japanese} <span style="color: #888;">(${response.english})</span>`;
+        suggestedResponsesContainer.appendChild(button);
+      });
+    }
+
+    // Live Transcript
+    const transcriptEl = this.querySelector("live-transcript");
+    if (transcriptEl) {
+      transcriptEl.setAttribute("translation", this.translation || "");
+      transcriptEl.setAttribute("show-translation", this.showTranslation);
+    }
+
     // Back Button
     const backBtn = this.querySelector("#back-to-missions");
     backBtn.addEventListener("click", () => {
@@ -383,6 +422,35 @@ class ViewChat extends HTMLElement {
       ["score", "feedback_pointers"]
     );
 
+    // Define Assistance Tool
+    const provideAssistanceTool = new FunctionCallDefinition(
+      "provide_assistance",
+      "Call this tool to provide translation and suggested responses to the user.",
+      {
+        type: "OBJECT",
+        properties: {
+          translation: {
+            type: "STRING",
+            description: "The English translation of the model's last response.",
+          },
+          suggested_responses: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                japanese: { type: "STRING" },
+                english: { type: "STRING" },
+              },
+              required: ["japanese", "english"],
+            },
+            description: "An array of suggested responses for the user in Japanese with English translations.",
+          },
+        },
+        required: ["translation", "suggested_responses"],
+      },
+      ["translation", "suggested_responses"]
+    );
+
     completeMissionTool.functionToCall = (args) => {
       console.log("🏆 [App] Mission Complete Tool Triggered!", args);
 
@@ -421,10 +489,41 @@ class ViewChat extends HTMLElement {
             detail: { view: "summary", result: result },
           })
         );
-      }, 2500); // 2.5 seconds delay
+// 2.5 seconds delay
+      }, 2500); 
+    };
+
+    provideAssistanceTool.functionToCall = (args) => {
+      console.log("🤝 [App] Assistance Tool Triggered!", args);
+      this.translation = args.translation;
+      this.suggestedResponses = args.suggested_responses;
+
+      // Update the transcript directly
+      const transcriptEl = this.querySelector("live-transcript");
+      if (transcriptEl) {
+        transcriptEl.setAttribute("translation", this.translation || "");
+        transcriptEl.updateLatestBubble();
+      }
+
+      // Update suggested responses directly
+      const suggestedResponsesContainer = this.querySelector("#suggested-responses");
+      if (suggestedResponsesContainer && this.suggestedResponses) {
+        suggestedResponsesContainer.innerHTML = "";
+        this.suggestedResponses.forEach(response => {
+          const button = document.createElement("button");
+          button.style.background = "#f0f0f0";
+          button.style.border = "1px solid #ccc";
+          button.style.padding = "5px 10px";
+          button.style.borderRadius = "5px";
+          button.style.cursor = "pointer";
+          button.innerHTML = `${response.japanese} <span style="color: #888;">(${response.english})</span>`;
+          suggestedResponsesContainer.appendChild(button);
+        });
+      }
     };
 
     this.client.addFunction(completeMissionTool);
+    this.client.addFunction(provideAssistanceTool);
 
     // Setup client callbacks for logging
     this.client.onConnectionStarted = () => {
@@ -531,10 +630,11 @@ Your goal is to be a PROACTIVE LANGUAGE MENTOR while staying in character as ${t
 
 TEACHING PROTOCOL:
 1. **Gentle Corrections**: If the user makes a clear mistake, respond in character first, then briefly provide a friendly correction or a "more natural way to say that" in ${fromLanguage}.
-2. **Vocabulary Boost**: Every few turns, suggest 1-2 relevant words or idioms in ${language} that fit the current situation and explain their meaning in ${fromLanguage}.
-3. **Mini-Checks**: Occasionally (every 3-4 turns), ask the user a quick "How would you say...?" question in ${fromLanguage} related to the mission to test their recall.
-4. **Scaffolding**: If the user is hesitant, provide the start of a sentence in ${language} or give them two options to choose from to keep the momentum.
-5. **Mixed-Language Support**: Use ${fromLanguage} for teaching moments, but always pivot back to ${language} to maintain the immersive feel.
+2. **Learning Support**: After every response in ${language}, you MUST call the "provide_assistance" tool with an English translation of your response and a list of 2-3 suggested responses for the user in both Japanese and English.
+3. **Vocabulary Boost**: Every few turns, suggest 1-2 relevant words or idioms in ${language} that fit the current situation and explain their meaning in ${fromLanguage}.
+4. **Mini-Checks**: Occasionally (every 3-4 turns), ask the user a quick "How would you say...?" question in ${fromLanguage} related to the mission to test their recall.
+5. **Scaffolding**: If the user is hesitant, provide the start of a sentence in ${language} or give them two options to choose from to keep the momentum.
+6. **Mixed-Language Support**: Use ${fromLanguage} for teaching moments, but always pivot back to ${language} to maintain the immersive feel.
 
 INTERACTION GUIDELINES:
 1. Prioritize the flow of conversation—don't let the teaching feel like a lecture.

@@ -30,7 +30,9 @@ class LiveTranscript extends HTMLElement {
   }
 
   addOutputTranscript(text, isFinal) {
-    this.updateTranscript('model', text, isFinal);
+    const translation = this.getAttribute("translation");
+    const showTranslation = this.getAttribute("show-translation") === "true";
+    this.updateTranscript('model', text, isFinal, translation, showTranslation);
   }
 
   finalizeAll() {
@@ -43,7 +45,7 @@ class LiveTranscript extends HTMLElement {
     });
   }
 
-  updateTranscript(role, text, isFinal) {
+  updateTranscript(role, text, isFinal, translation, showTranslation) {
     const container = this.shadowRoot.querySelector('.transcript-container');
     if (!container) return;
 
@@ -64,19 +66,32 @@ class LiveTranscript extends HTMLElement {
       bubble = document.createElement('div');
       bubble.className = `bubble temp ${role}`;
       bubble.dataset.role = role;
+      
+      const textElement = document.createElement('div');
+      textElement.className = 'text';
+      bubble.appendChild(textElement);
+
+      if (role === 'model') {
+        const translationElement = document.createElement('div');
+        translationElement.className = 'translation';
+        bubble.appendChild(translationElement);
+      }
+
       container.appendChild(bubble);
 
       // Auto scroll
       container.scrollTop = container.scrollHeight;
     }
 
+    const textElement = bubble.querySelector('.text');
+
     // Intelligent spacing:
     // If we have content, and we're not starting/ending with space, check if we need one.
-    const currentText = bubble.textContent;
+    const currentText = textElement.textContent;
     if (currentText.length > 0 && !currentText.endsWith(' ') && !text.startsWith(' ')) {
       // Check if starts with alphanumeric (approximate check for "word")
       if (/^[a-zA-Z0-9À-ÿ]/.test(text)) {
-        bubble.appendChild(document.createTextNode(' '));
+        textElement.appendChild(document.createTextNode(' '));
       }
     }
 
@@ -84,7 +99,17 @@ class LiveTranscript extends HTMLElement {
     const span = document.createElement('span');
     span.textContent = text;
     span.className = 'fade-span';
-    bubble.appendChild(span);
+    textElement.appendChild(span);
+
+    if (role === 'model' && translation) {
+      const translationElement = bubble.querySelector('.translation');
+      translationElement.textContent = translation;
+      if (showTranslation) {
+        translationElement.style.display = 'block';
+      } else {
+        translationElement.style.display = 'none';
+      }
+    }
 
     // Note: We ignore isFinal here because the backend might be sending it prematurely for chunks.
     // We rely on role-switching or explicit finalizeAll() calls to close bubbles.
@@ -160,6 +185,13 @@ class LiveTranscript extends HTMLElement {
         .bubble.temp {
           opacity: 0.7;
         }
+        
+        .translation {
+          font-size: 0.9rem;
+          color: #666;
+          font-style: italic;
+          margin-top: 5px;
+        }
 
         @keyframes popIn {
           0% { opacity: 0; transform: translateY(10px); }
@@ -181,6 +213,26 @@ class LiveTranscript extends HTMLElement {
         <!-- Transcripts go here -->
       </div>
     `;
+  }
+
+  updateLatestBubble() {
+    const container = this.shadowRoot.querySelector('.transcript-container');
+    if (!container) return;
+
+    const lastBubble = container.querySelector('.bubble.model:last-child');
+    if (lastBubble) {
+      const translation = this.getAttribute("translation");
+      const showTranslation = this.getAttribute("show-translation") === "true";
+      const translationElement = lastBubble.querySelector('.translation');
+      if (translationElement) {
+        translationElement.textContent = translation;
+        if (showTranslation) {
+          translationElement.style.display = 'block';
+        } else {
+          translationElement.style.display = 'none';
+        }
+      }
+    }
   }
 }
 
